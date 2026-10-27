@@ -1,0 +1,29 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+
+# Generated data and model downloads
+data/
+models/
+*.dump
+*.sql.gz
+
+# Python environments and cache
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+
+# Editor files, backups, logs
+.DS_Store
+.vscode/
+.idea/
+*.bak
+*.log

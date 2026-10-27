@@ -1,0 +1,23 @@
+# Python 3.12 recommended (matches the tested development environment).
+# Direct application dependencies pinned to locally tested versions.
+
+# API server and validation
+fastapi==0.142.4
+uvicorn==0.54.0
+pydantic==2.13.5
+python-multipart==0.0.32
+
+# Document extraction and vector operations
+pypdf==6.19.0
+numpy==2.5.3
+
+# Keyword retrieval, embeddings, reranking, and generation
+rank-bm25==0.2.2
+sentence-transformers==6.1.0
+transformers==5.19.0
+torch==2.14.1
+
+# PostgreSQL and registration email validation
+psycopg[binary]>=3.2,<4
+email-validator>=2.2,<3
+pgvector==0.5.1

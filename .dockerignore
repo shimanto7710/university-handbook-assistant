@@ -1,0 +1,29 @@
+# Secrets
+.env
+.env.*
+!.env.example
+.aws/
+
+# Local environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Notebooks and local data
+notebook/
+data/
+models/
+
+# Git and editor files
+.git/
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
