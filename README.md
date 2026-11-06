@@ -105,8 +105,11 @@ docker run --name handbook-db \
   -v handbook_pgdata:/var/lib/postgresql/data \
   -d pgvector/pgvector:pg17
 
-export DATABASE_URL='postgresql://handbook:CHANGE_ME@localhost:5433/handbook'
+cp .env.example .env
+# Edit .env and replace CHANGE_ME with your database password.
 ```
+
+The API and database import command automatically load the root `.env` file. Existing environment variables take precedence. Keep `.env` private; only `.env.example` is committed.
 
 If this container already exists, use `docker start handbook-db`. The volume persists database records across container replacements. Changing the container's password environment variable does not change an existing database password.
 
@@ -153,13 +156,13 @@ Complete the database import above first. The application image does not include
 docker build -t handbook-api .
 ```
 
-Create a local `.env` file (excluded from Git and Docker builds):
+For Docker on a Mac, update the host in your local `.env` from `localhost` to `host.docker.internal` (switch back when running Python directly):
 
 ```dotenv
 DATABASE_URL=postgresql://handbook:CHANGE_ME@host.docker.internal:5433/handbook
 ```
 
-Use your actual password and URL-encode it if needed. The API reads the environment supplied by Docker; it does not load `.env` automatically when run directly in Python.
+Use your actual password and URL-encode it if needed. Docker injects these values with `--env-file`; the secret file is excluded from the image. Direct Python runs load `.env` automatically.
 
 ```bash
 docker run --name handbook-api \

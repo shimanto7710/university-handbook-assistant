@@ -6,6 +6,7 @@ import secrets
 import json
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 import numpy as np
 from pgvector.psycopg import register_vector
@@ -14,6 +15,9 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+
+# Load local settings; Docker/AWS environment variables take precedence.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 
 def hash_password(password):
     salt = secrets.token_hex(16)

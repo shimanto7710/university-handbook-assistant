@@ -15,7 +15,7 @@ The notebooks are experiments; `retrieve.ipynb` keeps its own functions so they 
 ## Accounts and persistent chats
 
 The API uses PostgreSQL for accounts, login sessions, conversations, and chat turns.
-Set DATABASE_URL in the terminal before starting the server:
+Copy `.env.example` to `.env` and set your database connection there, or export DATABASE_URL before starting the server. Exported variables override `.env`:
 
 ```bash
 conda activate llm
