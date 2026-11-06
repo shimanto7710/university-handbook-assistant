@@ -1,35 +1,73 @@
 # University Handbook Assistant
 
-A learning and portfolio project that answers study questions from PDF and TXT documents. It combines keyword and vector retrieval, reranks the results, and uses a local language model to generate an answer with source metadata.
+A conversational RAG application for studying from lecture PDFs and text documents. It retrieves relevant passages, generates an answer, and returns the PDF name and page number so the reader can check the source.
 
-## How it works
+## Why I built it
+
+Before exams, useful information is often spread across several lecture files. I wanted to ask a question across those files, compare the relevant passages, and get one answer without losing track of where the information came from.
+
+I started in notebooks to understand each step, then moved the working pipeline into Python classes and added a FastAPI backend. The project now includes user accounts, saved conversations, optional document uploads, and PostgreSQL storage for both chat records and document embeddings.
+
+An example question is: **“What are the disadvantages of cloud computing?”** A follow-up could be: **“Explain the security concerns in more detail.”** The API retrieves evidence again for each question; it does not treat an earlier generated answer as a source document.
+
+## The pipeline
 
 ```text
-PDF / TXT → text extraction → page chunks → E5 embeddings → PostgreSQL + pgvector
+Preparation
+PDF / TXT → extract text → page chunks → E5 embeddings → PostgreSQL + pgvector
 
+Answering
 Question + optional history / uploaded file
-    → BM25 + semantic search → reciprocal-rank fusion → cross-encoder reranking
-    → relevance filtering → evidence prompt → Qwen answer + source metadata
+    → BM25 + vector search
+    → reciprocal-rank fusion
+    → cross-encoder reranking
+    → relevance filtering and prompt budgeting
+    → Qwen answer + source metadata
 ```
 
-- FastAPI endpoints for registration, login, questions, and conversations.
-- All completed chat turns are saved; history mode considers the last three.
-- Shared documents use pgvector with an HNSW cosine index.
-- Uploaded PDFs/TXT files are temporary for that request. Their candidates are combined with shared-document candidates. Saved chat sources can retain their extracted text.
-- Optional question rewriting and per-stage timings.
-- Source metadata includes filename, page, chunk text, and reranker score.
+The shared lecture corpus used during development contained **579 nonempty page chunks**. The lecture files, generated embeddings, model weights, and database records are excluded from this repository. You can prepare your own PDF or TXT files using the steps below.
 
-## Models
+## What the application supports
 
-| Purpose | Model |
+- Search across the shared corpus using keyword and semantic retrieval.
+- Upload a PDF or TXT file and search it together with the existing documents.
+- Register, log in, start a conversation, and retrieve saved chats.
+- Use the last three conversation turns for follow-up retrieval, with optional question rewriting.
+- Return source IDs, filenames, page numbers, retrieved text, and reranker scores alongside an answer.
+- Report time spent on rewriting, retrieval, reranking, and generation.
+
+Uploads are temporary for one request. Their extracted source text may be saved with the chat, but the uploaded document is not available for retrieval in later requests unless it is uploaded again.
+
+## Decisions and what I learned
+
+**Hybrid search before generation.** Keyword search helps with exact terms, while embeddings find related wording. I combine their rankings with reciprocal-rank fusion, then rerank a candidate pool of 30 passages before selecting up to five for the answer. These are configurable defaults, not benchmark-derived optimal values.
+
+**Page chunks for this dataset.** Keeping a lecture page together makes its source reference easy to follow. I check token lengths before embedding. This works for the lecture material used here, but long pages and text files need splitting; the preparation script rejects over-limit chunks instead of silently truncating them.
+
+**One database for chat and vector storage.** I first worked with local JSON and NumPy artifacts, then added PostgreSQL and pgvector. The API uses HNSW cosine search for stored vectors. A small corpus does not establish a speed advantage: the current code locally discourages sequential scans to practise using the index. Uploaded vectors are searched separately and merged with saved-vector candidates.
+
+**History has a cost.** Simply appending previous answers can make a retrieval query too long. The current version preserves the latest question and adds recent history within a token budget. Optional rewriting creates a standalone search question, but adds another LLM call. The final generation prompt contains previous questions and fresh evidence, not previous answers.
+
+**Fine-tuning was an experiment.** I tried a small LoRA adapter and compared it with the base model. The experiment did not demonstrate a reliable improvement, so the application uses the base model. The notebook is included as learning work, not evidence of improved model quality.
+
+**Source metadata is not proof of correctness.** The prompt asks for citations, and a format check flags missing or unknown source IDs. That check cannot establish whether a cited passage actually supports a claim. This remains an important limitation.
+
+## Stack
+
+| Part | Tools / model |
 |---|---|
-| Embeddings | `intfloat/multilingual-e5-base` (768 dimensions) |
+| Document processing | Python, pypdf, NumPy |
+| Embeddings | Sentence Transformers, `intfloat/multilingual-e5-base` (768 dimensions) |
+| Keyword retrieval | `rank-bm25` |
 | Reranking | `cross-encoder/ms-marco-MiniLM-L6-v2` |
-| Answer generation | `Qwen/Qwen2.5-1.5B-Instruct` |
+| Generation | PyTorch, Hugging Face Transformers, `Qwen/Qwen2.5-1.5B-Instruct` |
+| API | FastAPI, Pydantic |
+| Storage | PostgreSQL, pgvector, HNSW |
+| Development | Jupyter, Postman, Docker |
 
-The API uses the base generator. The fine-tuning notebook is an experiment, not a demonstrated quality improvement. Multilingual embeddings do not imply that the full pipeline has been evaluated across languages.
+Multilingual embeddings are used, but the complete pipeline has not been evaluated across languages.
 
-## Project files
+## Repository layout
 
 ```text
 app/process_data.py   Extract, chunk, embed, and save artifacts
@@ -37,7 +75,9 @@ app/retrieval.py      Hybrid search, reranking, evidence, and prompts
 app/generate.py       Generation and conversation handling
 app/database.py       SQL storage and vector search
 app/main.py           FastAPI routes
-notebook/             Self-contained learning experiments
+notebook/             Learning experiments; independent from the API modules
+Dockerfile           Application container
+PROJECT_GUIDE.md     Additional database and API notes
 ```
 
 ## Run locally from a fresh clone
@@ -144,7 +184,7 @@ docker run --rm --user root \
 
 For AWS, supply the RDS connection configuration at runtime, migrate or import the corpus, and set up network access and TLS. AWS deployment is planned, not completed.
 
-## Current limitations and validation
+## Status and remaining work
 
 - Citation-format validation detects missing or unknown source IDs. It does not validate factual support or require a citation on every claim. The model can still hallucinate.
 - The default reranker threshold is not calibrated against a held-out test set.
@@ -156,4 +196,4 @@ For AWS, supply the RDS connection configuration at runtime, migrate or import t
 - Generation requests are serialized within one API process. Rate limiting, request-level timeouts, and public-deployment hardening are not implemented.
 - Docker build has been attempted locally, but complete container startup and an end-to-end Docker API test remain unverified after disk-space failure.
 
-This is a portfolio project under development, not a production service. See [PROJECT_GUIDE.md](PROJECT_GUIDE.md) for database and conversation details.
+The next steps are completing the Docker smoke test, adding a small repeatable evaluation set and API tests, and deploying to AWS. This repository is a portfolio project under development. See [PROJECT_GUIDE.md](PROJECT_GUIDE.md) for database and conversation details.
